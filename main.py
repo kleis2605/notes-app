@@ -1,50 +1,50 @@
 from flask import Flask, request, redirect, render_template_string
+import os
+import psycopg
 
 app = Flask(__name__)
 
-NOTES_FILE = "notes.txt"
-
 
 # --------------------------------------------------
-# HENT NOTER FRA FIL
+# DATABASE
 # --------------------------------------------------
+
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+
+def get_connection():
+    return psycopg.connect(DATABASE_URL)
+
+
+def create_table():
+
+    with get_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS notes (
+                    id SERIAL PRIMARY KEY,
+                    text TEXT NOT NULL
+                )
+            """)
+
+        connection.commit()
+
 
 def load_notes():
-    try:
-        with open(NOTES_FILE, "r", encoding="utf-8") as file:
 
-            notes = []
+    with get_connection() as connection:
 
-            for line in file:
+        with connection.cursor() as cursor:
 
-                note = line.strip()
+            cursor.execute("""
+                SELECT id, text
+                FROM notes
+                ORDER BY id DESC
+            """)
 
-                if note:
-                    notes.append(note)
-
-            return notes
-
-    except FileNotFoundError:
-        return []
-
-
-# --------------------------------------------------
-# GEM NOTER I FIL
-# --------------------------------------------------
-
-def save_notes(notes):
-
-    with open(NOTES_FILE, "w", encoding="utf-8") as file:
-
-        for note in notes:
-            file.write(note + "\n")
-
-
-# --------------------------------------------------
-# HENT NOTER VED START
-# --------------------------------------------------
-
-notes = load_notes()
+            return cursor.fetchall()
 
 
 # --------------------------------------------------
@@ -111,10 +111,6 @@ PAGE = """
         }
 
 
-        /* --------------------------------------------------
-           TOPBAR
-        -------------------------------------------------- */
-
         .topbar {
             position: sticky;
 
@@ -148,10 +144,6 @@ PAGE = """
         }
 
 
-        /* --------------------------------------------------
-           NOTER
-        -------------------------------------------------- */
-
         .notes {
             padding: 20px;
         }
@@ -167,10 +159,6 @@ PAGE = """
             padding: 18px;
 
             margin-bottom: 14px;
-
-            box-shadow:
-                0 8px 25px
-                rgba(0, 0, 0, 0.2);
         }
 
 
@@ -184,10 +172,6 @@ PAGE = """
             white-space: pre-wrap;
         }
 
-
-        /* --------------------------------------------------
-           KNAPPER UNDER NOTEN
-        -------------------------------------------------- */
 
         .note-actions {
             display: flex;
@@ -212,19 +196,8 @@ PAGE = """
             font-weight: 500;
 
             cursor: pointer;
-
-            transition:
-                background 0.15s,
-                transform 0.15s;
         }
 
-
-        .action-button:active {
-            transform: scale(0.94);
-        }
-
-
-        /* REDIGER KNAP */
 
         .edit-button {
             background: #292929;
@@ -232,13 +205,6 @@ PAGE = """
             color: #e5e5e5;
         }
 
-
-        .edit-button:hover {
-            background: #383838;
-        }
-
-
-        /* SLET KNAP */
 
         .delete-button {
             background: transparent;
@@ -248,15 +214,6 @@ PAGE = """
             border: 1px solid #4b2626;
         }
 
-
-        .delete-button:hover {
-            background: #351919;
-        }
-
-
-        /* --------------------------------------------------
-           PLUS KNAP
-        -------------------------------------------------- */
 
         .add-button {
             position: fixed;
@@ -286,25 +243,8 @@ PAGE = """
                 rgba(0, 0, 0, 0.5);
 
             z-index: 20;
-
-            transition:
-                transform 0.15s;
         }
 
-
-        .add-button:hover {
-            transform: scale(1.05);
-        }
-
-
-        .add-button:active {
-            transform: scale(0.92);
-        }
-
-
-        /* --------------------------------------------------
-           GENEREL POPUP BAGGRUND
-        -------------------------------------------------- */
 
         .modal-background {
             position: fixed;
@@ -333,10 +273,6 @@ PAGE = """
         }
 
 
-        /* --------------------------------------------------
-           GENEREL POPUP
-        -------------------------------------------------- */
-
         .modal {
             width: 100%;
 
@@ -353,24 +289,6 @@ PAGE = """
             box-shadow:
                 0 20px 60px
                 rgba(0, 0, 0, 0.5);
-
-            animation:
-                popup 0.18s ease-out;
-        }
-
-
-        @keyframes popup {
-
-            from {
-                opacity: 0;
-                transform: scale(0.94);
-            }
-
-            to {
-                opacity: 1;
-                transform: scale(1);
-            }
-
         }
 
 
@@ -401,11 +319,6 @@ PAGE = """
             font-size: 17px;
 
             outline: none;
-        }
-
-
-        textarea:focus {
-            border-color: #777;
         }
 
 
@@ -449,51 +362,12 @@ PAGE = """
         }
 
 
-        /* --------------------------------------------------
-           SLET POPUP
-        -------------------------------------------------- */
+        .delete-confirm {
+            background: #d84040;
 
-        .delete-modal {
-            max-width: 380px;
-        }
+            color: white;
 
-
-        .delete-icon {
-            width: 54px;
-
-            height: 54px;
-
-            display: flex;
-
-            justify-content: center;
-
-            align-items: center;
-
-            margin-bottom: 16px;
-
-            border-radius: 16px;
-
-            background: #351919;
-
-            color: #ff5c5c;
-
-            font-size: 25px;
-
-            font-weight: bold;
-        }
-
-
-        .delete-modal h2 {
-            margin-bottom: 8px;
-        }
-
-
-        .delete-modal p {
-            margin: 0;
-
-            color: #999;
-
-            line-height: 1.5;
+            font-weight: 600;
         }
 
 
@@ -509,32 +383,8 @@ PAGE = """
             border-radius: 14px;
 
             color: #ddd;
-
-            overflow-wrap: anywhere;
-
-            max-height: 120px;
-
-            overflow-y: auto;
         }
 
-
-        .delete-confirm {
-            background: #d84040;
-
-            color: white;
-
-            font-weight: 600;
-        }
-
-
-        .delete-confirm:hover {
-            background: #ec4b4b;
-        }
-
-
-        /* --------------------------------------------------
-           INGEN NOTER
-        -------------------------------------------------- */
 
         .empty-state {
             text-align: center;
@@ -549,22 +399,6 @@ PAGE = """
             font-size: 55px;
         }
 
-
-        .empty-state h2 {
-            color: #aaa;
-
-            margin-bottom: 5px;
-        }
-
-
-        .empty-state p {
-            margin-top: 0;
-        }
-
-
-        /* --------------------------------------------------
-           PC
-        -------------------------------------------------- */
 
         @media (min-width: 650px) {
 
@@ -584,8 +418,6 @@ PAGE = """
 
     <div class="app">
 
-
-        <!-- TOPBAR -->
 
         <div class="topbar">
 
@@ -612,9 +444,6 @@ PAGE = """
         </div>
 
 
-
-        <!-- NOTER -->
-
         <div class="notes">
 
 
@@ -626,13 +455,13 @@ PAGE = """
 
                     <div
                         class="note-card"
-                        data-index="{{ loop.index0 }}"
+                        data-id="{{ note[0] }}"
                     >
 
 
                         <div class="note-text">
 
-                            {{ note }}
+                            {{ note[1] }}
 
                         </div>
 
@@ -692,12 +521,8 @@ PAGE = """
 
         </div>
 
-
     </div>
 
-
-
-    <!-- PLUS KNAP -->
 
     <button
         class="add-button"
@@ -707,20 +532,15 @@ PAGE = """
     </button>
 
 
-
-    <!-- --------------------------------------------------
-         NY NOTE POPUP
-    -------------------------------------------------- -->
+    <!-- NY NOTE -->
 
     <div
         class="modal-background"
         id="addModal"
-        onclick="closeAddModalFromBackground(event)"
+        onclick="closeBackground(event, 'addModal')"
     >
 
-
         <div class="modal">
-
 
             <h2>
                 Ny note
@@ -744,7 +564,7 @@ PAGE = """
                     <button
                         type="button"
                         class="cancel-button"
-                        onclick="closeAddModal()"
+                        onclick="closeModal('addModal')"
                     >
                         Annuller
                     </button>
@@ -763,24 +583,18 @@ PAGE = """
 
             </form>
 
-
         </div>
-
 
     </div>
 
 
-
-    <!-- --------------------------------------------------
-         REDIGER POPUP
-    -------------------------------------------------- -->
+    <!-- REDIGER -->
 
     <div
         class="modal-background"
         id="editModal"
-        onclick="closeEditModalFromBackground(event)"
+        onclick="closeBackground(event, 'editModal')"
     >
-
 
         <div class="modal">
 
@@ -798,14 +612,14 @@ PAGE = """
 
                 <input
                     type="hidden"
-                    name="index"
-                    id="editIndex"
+                    name="id"
+                    id="editId"
                 >
 
 
                 <textarea
                     name="note"
-                    id="editNoteInput"
+                    id="editNote"
                     required
                 ></textarea>
 
@@ -816,7 +630,7 @@ PAGE = """
                     <button
                         type="button"
                         class="cancel-button"
-                        onclick="closeEditModal()"
+                        onclick="closeModal('editModal')"
                     >
                         Annuller
                     </button>
@@ -835,31 +649,20 @@ PAGE = """
 
             </form>
 
-
         </div>
-
 
     </div>
 
 
-
-    <!-- --------------------------------------------------
-         SLET POPUP
-    -------------------------------------------------- -->
+    <!-- SLET -->
 
     <div
         class="modal-background"
         id="deleteModal"
-        onclick="closeDeleteModalFromBackground(event)"
+        onclick="closeBackground(event, 'deleteModal')"
     >
 
-
-        <div class="modal delete-modal">
-
-
-            <div class="delete-icon">
-                !
-            </div>
+        <div class="modal">
 
 
             <h2>
@@ -868,7 +671,7 @@ PAGE = """
 
 
             <p>
-                Er du sikker? Denne handling kan ikke fortrydes.
+                Denne handling kan ikke fortrydes.
             </p>
 
 
@@ -887,8 +690,8 @@ PAGE = """
 
                 <input
                     type="hidden"
-                    name="index"
-                    id="deleteIndex"
+                    name="id"
+                    id="deleteId"
                 >
 
 
@@ -898,7 +701,7 @@ PAGE = """
                     <button
                         type="button"
                         class="cancel-button"
-                        onclick="closeDeleteModal()"
+                        onclick="closeModal('deleteModal')"
                     >
                         Behold
                     </button>
@@ -917,24 +720,13 @@ PAGE = """
 
             </form>
 
-
         </div>
-
 
     </div>
 
 
-
-    <!-- --------------------------------------------------
-         JAVASCRIPT
-    -------------------------------------------------- -->
-
     <script>
 
-
-        // --------------------------------------------------
-        // NY NOTE
-        // --------------------------------------------------
 
         function openAddModal() {
 
@@ -944,206 +736,91 @@ PAGE = """
             const input =
                 document.getElementById("noteInput");
 
-
             modal.classList.add("show");
 
-
             setTimeout(function() {
-
                 input.focus();
-
             }, 100);
 
         }
 
 
-        function closeAddModal() {
-
-            document
-                .getElementById("addModal")
-                .classList
-                .remove("show");
-
-        }
-
-
-        function closeAddModalFromBackground(event) {
-
-            if (event.target.id === "addModal") {
-
-                closeAddModal();
-
-            }
-
-        }
-
-
-
-        // --------------------------------------------------
-        // REDIGER NOTE
-        // --------------------------------------------------
-
         function openEditModal(button) {
 
-            // Find hele note-kortet
             const card =
                 button.closest(".note-card");
 
+            const id =
+                card.dataset.id;
 
-            // Hent note-nummeret
-            const index =
-                card.dataset.index;
-
-
-            // Hent note-teksten
-            const noteText =
+            const text =
                 card
                     .querySelector(".note-text")
                     .textContent
                     .trim();
 
+            document.getElementById("editId").value =
+                id;
 
-            // Find popup
-            const modal =
-                document.getElementById("editModal");
-
-
-            // Find skjult index-felt
-            const indexInput =
-                document.getElementById("editIndex");
-
-
-            // Find textarea
-            const editInput =
-                document.getElementById("editNoteInput");
-
-
-            // Gem note-nummer
-            indexInput.value = index;
-
-
-            // Put eksisterende tekst ind
-            editInput.value = noteText;
-
-
-            // Vis popup
-            modal.classList.add("show");
-
-
-            setTimeout(function() {
-
-                editInput.focus();
-
-                editInput.setSelectionRange(
-                    editInput.value.length,
-                    editInput.value.length
-                );
-
-            }, 100);
-
-        }
-
-
-        function closeEditModal() {
+            document.getElementById("editNote").value =
+                text;
 
             document
                 .getElementById("editModal")
                 .classList
-                .remove("show");
+                .add("show");
 
         }
 
-
-        function closeEditModalFromBackground(event) {
-
-            if (event.target.id === "editModal") {
-
-                closeEditModal();
-
-            }
-
-        }
-
-
-
-        // --------------------------------------------------
-        // SLET NOTE
-        // --------------------------------------------------
 
         function openDeleteModal(button) {
 
-            // Find note-kortet
             const card =
                 button.closest(".note-card");
 
+            const id =
+                card.dataset.id;
 
-            // Hent note-nummer
-            const index =
-                card.dataset.index;
-
-
-            // Hent note-tekst
-            const noteText =
+            const text =
                 card
                     .querySelector(".note-text")
                     .textContent
                     .trim();
 
+            document.getElementById("deleteId").value =
+                id;
 
-            // Find popup
-            const modal =
-                document.getElementById("deleteModal");
+            document.getElementById("deletePreview").textContent =
+                text;
 
-
-            // Find preview
-            const preview =
-                document.getElementById("deletePreview");
-
-
-            // Find skjult index-felt
-            const indexInput =
-                document.getElementById("deleteIndex");
-
-
-            // Vis teksten
-            preview.textContent = noteText;
-
-
-            // Gem index
-            indexInput.value = index;
-
-
-            // Vis popup
-            modal.classList.add("show");
+            document
+                .getElementById("deleteModal")
+                .classList
+                .add("show");
 
         }
 
 
-        function closeDeleteModal() {
+        function closeModal(id) {
 
             document
-                .getElementById("deleteModal")
+                .getElementById(id)
                 .classList
                 .remove("show");
 
         }
 
 
-        function closeDeleteModalFromBackground(event) {
+        function closeBackground(event, id) {
 
-            if (event.target.id === "deleteModal") {
+            if (event.target.id === id) {
 
-                closeDeleteModal();
+                closeModal(id);
 
             }
 
         }
 
-
-
-        // --------------------------------------------------
-        // ESCAPE LUKKER ALLE POPUPS
-        // --------------------------------------------------
 
         document.addEventListener(
             "keydown",
@@ -1151,11 +828,11 @@ PAGE = """
 
                 if (event.key === "Escape") {
 
-                    closeAddModal();
+                    closeModal("addModal");
 
-                    closeEditModal();
+                    closeModal("editModal");
 
-                    closeDeleteModal();
+                    closeModal("deleteModal");
 
                 }
 
@@ -1173,31 +850,41 @@ PAGE = """
 
 
 # --------------------------------------------------
-# FORSIDE + NY NOTE
+# FORSIDE + OPRET NOTE
 # --------------------------------------------------
 
 @app.route("/", methods=["GET", "POST"])
 def home():
 
-    global notes
-
-
     if request.method == "POST":
 
-        new_note = request.form.get(
+        note = request.form.get(
             "note",
             ""
         ).strip()
 
 
-        if new_note:
+        if note:
 
-            notes.append(new_note)
+            with get_connection() as connection:
 
-            save_notes(notes)
+                with connection.cursor() as cursor:
+
+                    cursor.execute(
+                        """
+                        INSERT INTO notes (text)
+                        VALUES (%s)
+                        """,
+                        (note,)
+                    )
+
+                connection.commit()
 
 
         return redirect("/")
+
+
+    notes = load_notes()
 
 
     return render_template_string(
@@ -1213,39 +900,33 @@ def home():
 @app.route("/edit", methods=["POST"])
 def edit_note():
 
-    global notes
+    note_id = request.form.get("id")
 
-
-    index = request.form.get("index")
-
-    new_note = request.form.get(
+    note = request.form.get(
         "note",
         ""
     ).strip()
 
 
-    if index is not None:
+    if note_id and note:
 
-        try:
+        with get_connection() as connection:
 
-            index = int(index)
+            with connection.cursor() as cursor:
 
-        except ValueError:
+                cursor.execute(
+                    """
+                    UPDATE notes
+                    SET text = %s
+                    WHERE id = %s
+                    """,
+                    (
+                        note,
+                        note_id
+                    )
+                )
 
-            return redirect("/")
-
-
-        if (
-            0 <= index < len(notes)
-            and new_note
-        ):
-
-            # Erstat den gamle note
-            notes[index] = new_note
-
-
-            # Gem ændringen i notes.txt
-            save_notes(notes)
+            connection.commit()
 
 
     return redirect("/")
@@ -1258,36 +939,35 @@ def edit_note():
 @app.route("/delete", methods=["POST"])
 def delete_note():
 
-    global notes
+    note_id = request.form.get("id")
 
 
-    index = request.form.get("index")
+    if note_id:
 
+        with get_connection() as connection:
 
-    if index is not None:
+            with connection.cursor() as cursor:
 
-        try:
+                cursor.execute(
+                    """
+                    DELETE FROM notes
+                    WHERE id = %s
+                    """,
+                    (note_id,)
+                )
 
-            index = int(index)
-
-        except ValueError:
-
-            return redirect("/")
-
-
-        if 0 <= index < len(notes):
-
-            notes.pop(index)
-
-            save_notes(notes)
+            connection.commit()
 
 
     return redirect("/")
 
 
 # --------------------------------------------------
-# START SERVER
+# START
 # --------------------------------------------------
+
+create_table()
+
 
 if __name__ == "__main__":
 
