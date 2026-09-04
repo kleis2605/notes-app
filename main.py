@@ -1,7 +1,6 @@
-from flask import Flask, request, redirect, render_template_string, url_for
+from flask import Flask, request, redirect, render_template_string
 import os
 import psycopg
-
 
 app = Flask(__name__)
 
@@ -13,24 +12,18 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 # ==========================================================
 
 def get_connection():
-
     if not DATABASE_URL:
         raise RuntimeError(
-            "DATABASE_URL mangler. "
-            "Sæt DATABASE_URL i Render Environment Variables."
+            "DATABASE_URL mangler. Sæt den i Render Environment Variables."
         )
 
     return psycopg.connect(DATABASE_URL)
 
 
-
 def create_table():
-
     with get_connection() as connection:
-
         with connection.cursor() as cursor:
 
-            # Lav notes-tabellen hvis den ikke findes
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS notes (
                     id SERIAL PRIMARY KEY,
@@ -38,42 +31,31 @@ def create_table():
                 )
             """)
 
-
-            # Tilføj pinned hvis kolonnen ikke findes endnu
             cursor.execute("""
                 ALTER TABLE notes
                 ADD COLUMN IF NOT EXISTS pinned BOOLEAN DEFAULT FALSE
             """)
 
-
-            # Tilføj created_at hvis den ikke findes endnu
             cursor.execute("""
                 ALTER TABLE notes
                 ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ
                 DEFAULT CURRENT_TIMESTAMP
             """)
 
-
-            # Tilføj updated_at hvis den ikke findes endnu
             cursor.execute("""
                 ALTER TABLE notes
                 ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ
                 DEFAULT CURRENT_TIMESTAMP
             """)
 
-
         connection.commit()
 
 
-
 def load_notes(search=""):
-
     with get_connection() as connection:
-
         with connection.cursor() as cursor:
 
             if search:
-
                 cursor.execute(
                     """
                     SELECT
@@ -93,7 +75,6 @@ def load_notes(search=""):
                 )
 
             else:
-
                 cursor.execute("""
                     SELECT
                         id,
@@ -108,8 +89,19 @@ def load_notes(search=""):
                         id DESC
                 """)
 
-
             return cursor.fetchall()
+
+
+def get_total_notes():
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+
+            cursor.execute("""
+                SELECT COUNT(*)
+                FROM notes
+            """)
+
+            return cursor.fetchone()[0]
 
 
 # ==========================================================
@@ -137,26 +129,18 @@ PAGE = """
 
     <title>Mine Noter</title>
 
-
     <style>
-
-        /* ==================================================
-           GENERELT
-        ================================================== */
 
         * {
             box-sizing: border-box;
         }
 
-
         html {
             scroll-behavior: smooth;
         }
 
-
         body {
             margin: 0;
-
             min-height: 100vh;
 
             font-family:
@@ -174,10 +158,8 @@ PAGE = """
                 );
 
             background-attachment: fixed;
-
             color: white;
         }
-
 
         button,
         textarea,
@@ -185,97 +167,61 @@ PAGE = """
             font-family: inherit;
         }
 
-
         button {
             -webkit-tap-highlight-color: transparent;
         }
 
-
         .app {
             width: 100%;
-
             max-width: 720px;
-
             margin: 0 auto;
-
             min-height: 100vh;
-
             padding-bottom: 130px;
         }
 
-
-        /* ==================================================
-           TOPBAR
-        ================================================== */
-
         .topbar {
             position: sticky;
-
             top: 0;
-
             z-index: 20;
 
-            padding:
-                20px
-                18px
-                16px;
+            padding: 20px 18px 16px;
 
             background:
                 rgba(11, 11, 13, 0.82);
 
-            backdrop-filter:
-                blur(20px);
-
-            -webkit-backdrop-filter:
-                blur(20px);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
 
             border-bottom:
                 1px solid
                 rgba(255, 255, 255, 0.06);
         }
 
-
         .topbar-row {
             display: flex;
-
             justify-content: space-between;
-
             align-items: center;
-
             gap: 15px;
         }
 
-
         .title-area h1 {
             margin: 0;
-
             font-size: 30px;
-
             letter-spacing: -1px;
         }
 
-
         .title-area p {
-            margin:
-                4px
-                0
-                0;
-
+            margin: 4px 0 0;
             color: #85858f;
-
             font-size: 14px;
         }
 
-
         .app-badge {
             display: flex;
-
             align-items: center;
-
             justify-content: center;
 
             width: 46px;
-
             height: 46px;
 
             border-radius: 15px;
@@ -288,47 +234,26 @@ PAGE = """
                 );
 
             color: #111;
-
             font-size: 23px;
-
-            box-shadow:
-                0
-                8px
-                30px
-                rgba(255, 255, 255, 0.08);
         }
-
-
-        /* ==================================================
-           SØGNING
-        ================================================== */
 
         .search-area {
             margin-top: 16px;
         }
 
-
         .search-form {
             position: relative;
-
             display: flex;
-
             align-items: center;
         }
 
-
         .search-icon {
             position: absolute;
-
             left: 15px;
-
             pointer-events: none;
-
             font-size: 17px;
-
             opacity: 0.55;
         }
-
 
         .search-input {
             width: 100%;
@@ -340,105 +265,60 @@ PAGE = """
                 44px;
 
             border: 1px solid #29292f;
-
             border-radius: 15px;
-
             outline: none;
 
             background: #17171b;
-
             color: white;
-
             font-size: 16px;
-
-            transition:
-                border-color 0.15s,
-                background 0.15s;
         }
-
 
         .search-input:focus {
             border-color: #51515c;
-
             background: #1b1b20;
         }
 
-
         .clear-search {
             position: absolute;
-
             right: 10px;
 
             width: 32px;
-
             height: 32px;
 
             display: flex;
-
             justify-content: center;
-
             align-items: center;
 
-            border: none;
-
             border-radius: 10px;
-
             background: #29292f;
-
             color: #aaa;
-
             text-decoration: none;
-
             font-size: 18px;
         }
 
-
-        /* ==================================================
-           SEKTION
-        ================================================== */
-
         .notes {
-            padding:
-                20px
-                18px;
+            padding: 20px 18px;
         }
-
 
         .section-title {
             display: flex;
-
             align-items: center;
-
             gap: 8px;
 
-            margin:
-                3px
-                2px
-                12px;
+            margin: 3px 2px 12px;
 
             color: #85858f;
-
             font-size: 13px;
-
             font-weight: 600;
-
             text-transform: uppercase;
-
             letter-spacing: 1px;
         }
-
-
-        /* ==================================================
-           NOTE CARD
-        ================================================== */
 
         .note-card {
             position: relative;
 
             margin-bottom: 13px;
-
             padding: 18px;
-
             overflow: hidden;
 
             background:
@@ -455,28 +335,7 @@ PAGE = """
                 10px
                 30px
                 rgba(0, 0, 0, 0.18);
-
-            transition:
-                transform 0.15s,
-                border-color 0.15s,
-                background 0.15s;
         }
-
-
-        .note-card:hover {
-            border-color:
-                rgba(255, 255, 255, 0.12);
-
-            background:
-                rgba(31, 31, 37, 0.96);
-        }
-
-
-        .note-card:active {
-            transform:
-                scale(0.995);
-        }
-
 
         .note-card.pinned {
             border-color:
@@ -490,94 +349,43 @@ PAGE = """
                 );
         }
 
-
-        .pin-glow {
-            position: absolute;
-
-            width: 100px;
-
-            height: 100px;
-
-            right: -50px;
-
-            top: -50px;
-
-            border-radius: 50%;
-
-            background:
-                rgba(255, 196, 82, 0.09);
-
-            filter:
-                blur(20px);
-
-            pointer-events: none;
-        }
-
-
         .note-top {
             display: flex;
-
             justify-content: space-between;
-
             align-items: flex-start;
-
             gap: 12px;
         }
 
-
         .note-text {
             flex: 1;
-
             font-size: 17px;
-
             line-height: 1.55;
-
             overflow-wrap: anywhere;
-
             white-space: pre-wrap;
         }
-
-
-        /* ==================================================
-           PIN KNAP
-        ================================================== */
 
         .pin-form {
             margin: 0;
         }
 
-
         .pin-button {
             width: 40px;
-
             height: 40px;
-
             flex-shrink: 0;
 
             display: flex;
-
             justify-content: center;
-
             align-items: center;
 
             border: 1px solid #303036;
-
             border-radius: 12px;
 
             background: #222228;
-
             color: #aaa;
 
             font-size: 18px;
-
             cursor: pointer;
-
-            transition:
-                transform 0.15s,
-                background 0.15s,
-                color 0.15s;
         }
-
 
         .pin-button.active {
             background:
@@ -589,98 +397,48 @@ PAGE = """
             color: #ffc452;
         }
 
-
-        .pin-button:active {
-            transform:
-                scale(0.9);
-        }
-
-
-        /* ==================================================
-           NOTE INFO
-        ================================================== */
-
         .note-meta {
             display: flex;
-
             align-items: center;
-
             flex-wrap: wrap;
 
-            gap:
-                6px
-                10px;
+            gap: 6px 10px;
 
             margin-top: 14px;
 
             color: #72727c;
-
             font-size: 12px;
         }
 
-
         .pinned-label {
             color: #ffc452;
-
             font-weight: 600;
         }
-
-
-        /* ==================================================
-           NOTE KNAPPER
-        ================================================== */
 
         .note-actions {
             display: flex;
-
             justify-content: flex-end;
-
             gap: 8px;
-
             margin-top: 16px;
         }
 
-
         .action-button {
             min-height: 38px;
-
-            padding:
-                8px
-                14px;
+            padding: 8px 14px;
 
             border: none;
-
             border-radius: 11px;
 
             font-size: 14px;
-
             font-weight: 600;
 
             cursor: pointer;
-
-            transition:
-                transform 0.15s,
-                background 0.15s;
         }
-
-
-        .action-button:active {
-            transform:
-                scale(0.94);
-        }
-
 
         .edit-button {
             background: #29292f;
-
             color: #ddd;
         }
-
-
-        .edit-button:hover {
-            background: #35353d;
-        }
-
 
         .delete-button {
             background:
@@ -692,17 +450,6 @@ PAGE = """
 
             color: #ff6868;
         }
-
-
-        .delete-button:hover {
-            background:
-                rgba(255, 70, 70, 0.14);
-        }
-
-
-        /* ==================================================
-           PLUS KNAP
-        ================================================== */
 
         .add-button {
             position: fixed;
@@ -716,17 +463,13 @@ PAGE = """
                 );
 
             width: 66px;
-
             height: 66px;
 
             display: flex;
-
             justify-content: center;
-
             align-items: center;
 
             border: none;
-
             border-radius: 50%;
 
             background:
@@ -737,10 +480,7 @@ PAGE = """
                 );
 
             color: #111;
-
             font-size: 36px;
-
-            font-weight: 300;
 
             cursor: pointer;
 
@@ -751,37 +491,14 @@ PAGE = """
                 rgba(0, 0, 0, 0.45);
 
             z-index: 30;
-
-            transition:
-                transform 0.15s;
         }
-
-
-        .add-button:hover {
-            transform:
-                scale(1.05);
-        }
-
-
-        .add-button:active {
-            transform:
-                scale(0.92);
-        }
-
-
-        /* ==================================================
-           POPUP BAGGRUND
-        ================================================== */
 
         .modal-background {
             position: fixed;
-
             inset: 0;
 
             display: none;
-
             justify-content: center;
-
             align-items: center;
 
             padding: 18px;
@@ -789,28 +506,18 @@ PAGE = """
             background:
                 rgba(0, 0, 0, 0.72);
 
-            backdrop-filter:
-                blur(10px);
-
-            -webkit-backdrop-filter:
-                blur(10px);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
 
             z-index: 100;
         }
-
 
         .modal-background.show {
             display: flex;
         }
 
-
-        /* ==================================================
-           POPUP
-        ================================================== */
-
         .modal {
             width: 100%;
-
             max-width: 500px;
 
             padding: 24px;
@@ -828,81 +535,38 @@ PAGE = """
                 25px
                 70px
                 rgba(0, 0, 0, 0.55);
-
-            animation:
-                popup 0.18s ease-out;
         }
-
-
-        @keyframes popup {
-
-            from {
-                opacity: 0;
-
-                transform:
-                    scale(0.94)
-                    translateY(10px);
-            }
-
-            to {
-                opacity: 1;
-
-                transform:
-                    scale(1)
-                    translateY(0);
-            }
-
-        }
-
 
         .modal-icon {
             width: 50px;
-
             height: 50px;
 
             display: flex;
-
             justify-content: center;
-
             align-items: center;
 
             margin-bottom: 16px;
 
             border-radius: 15px;
-
             background: #28282e;
 
             font-size: 22px;
         }
 
-
         .modal h2 {
-            margin:
-                0
-                0
-                7px;
-
+            margin: 0 0 7px;
             font-size: 23px;
         }
 
-
         .modal-description {
-            margin:
-                0
-                0
-                18px;
-
+            margin: 0 0 18px;
             color: #888892;
-
             font-size: 14px;
-
             line-height: 1.45;
         }
 
-
         textarea {
             width: 100%;
-
             min-height: 160px;
 
             resize: vertical;
@@ -910,69 +574,44 @@ PAGE = """
             padding: 15px;
 
             border: 1px solid #34343c;
-
             border-radius: 15px;
-
             outline: none;
 
             background: #101013;
-
             color: white;
 
             font-size: 17px;
-
             line-height: 1.45;
         }
 
-
-        textarea:focus {
-            border-color: #666674;
-        }
-
-
         .modal-buttons {
             display: flex;
-
             gap: 10px;
-
             margin-top: 15px;
         }
 
-
         .modal-buttons button {
             flex: 1;
-
             min-height: 48px;
 
             border: none;
-
             border-radius: 14px;
 
             font-size: 15px;
-
             font-weight: 600;
 
             cursor: pointer;
         }
 
-
         .cancel-button {
             background: #29292f;
-
             color: white;
         }
 
-
         .save-button {
             background: white;
-
             color: #111;
         }
-
-
-        /* ==================================================
-           SLET POPUP
-        ================================================== */
 
         .delete-icon {
             background:
@@ -981,12 +620,10 @@ PAGE = """
             color: #ff6262;
         }
 
-
         .delete-preview {
             max-height: 130px;
 
             margin-top: 16px;
-
             padding: 14px;
 
             overflow-y: auto;
@@ -994,87 +631,51 @@ PAGE = """
             background: #101013;
 
             border: 1px solid #29292f;
-
             border-radius: 14px;
 
             color: #ccc;
-
             line-height: 1.4;
-
             overflow-wrap: anywhere;
         }
 
-
         .delete-confirm {
             background: #dc4141;
-
             color: white;
         }
 
-
-        /* ==================================================
-           TOM APP
-        ================================================== */
-
         .empty-state {
-            padding:
-                90px
-                20px;
-
+            padding: 90px 20px;
             text-align: center;
-
             color: #777781;
         }
 
-
         .empty-icon {
             width: 68px;
-
             height: 68px;
 
             display: flex;
-
             justify-content: center;
-
             align-items: center;
 
-            margin:
-                0
-                auto
-                18px;
+            margin: 0 auto 18px;
 
             border-radius: 22px;
-
             background: #1b1b20;
-
             border: 1px solid #29292f;
 
             font-size: 30px;
         }
 
-
         .empty-state h2 {
-            margin:
-                0
-                0
-                6px;
-
+            margin: 0 0 6px;
             color: #b5b5bd;
-
             font-size: 20px;
         }
 
-
         .empty-state p {
             margin: 0;
-
             font-size: 14px;
         }
-
-
-        /* ==================================================
-           PC
-        ================================================== */
 
         @media (min-width: 720px) {
 
@@ -1087,55 +688,29 @@ PAGE = """
 
         }
 
-
-        /* ==================================================
-           MOBIL
-        ================================================== */
-
         @media (max-width: 520px) {
 
             .title-area h1 {
                 font-size: 27px;
             }
 
-
-            .app-badge {
-                width: 42px;
-
-                height: 42px;
-
-                border-radius: 14px;
-            }
-
-
             .notes {
-                padding:
-                    16px
-                    14px;
+                padding: 16px 14px;
             }
-
 
             .topbar {
-                padding:
-                    18px
-                    14px
-                    14px;
+                padding: 18px 14px 14px;
             }
-
 
             .note-card {
                 border-radius: 18px;
-
                 padding: 16px;
             }
 
-
             .modal-background {
                 align-items: flex-end;
-
                 padding: 0;
             }
-
 
             .modal {
                 max-width: none;
@@ -1153,26 +728,6 @@ PAGE = """
                         24px +
                         env(safe-area-inset-bottom)
                     );
-
-                animation:
-                    mobilePopup
-                    0.22s
-                    ease-out;
-            }
-
-
-            @keyframes mobilePopup {
-
-                from {
-                    transform:
-                        translateY(100%);
-                }
-
-                to {
-                    transform:
-                        translateY(0);
-                }
-
             }
 
         }
@@ -1187,10 +742,6 @@ PAGE = """
 
     <div class="app">
 
-
-        <!-- =================================================
-             TOPBAR
-        ================================================== -->
 
         <div class="topbar">
 
@@ -1230,8 +781,6 @@ PAGE = """
 
             </div>
 
-
-            <!-- SØG -->
 
             <div class="search-area">
 
@@ -1279,10 +828,6 @@ PAGE = """
 
 
 
-        <!-- =================================================
-             NOTER
-        ================================================== -->
-
         <div class="notes">
 
 
@@ -1290,11 +835,7 @@ PAGE = """
 
                 <div class="section-title">
 
-                    Søgeresultater
-
-                    ·
-
-                    {{ notes|length }}
+                    Søgeresultater · {{ notes|length }}
 
                 </div>
 
@@ -1319,15 +860,6 @@ PAGE = """
                     >
 
 
-                        {% if note[2] %}
-
-                            <div class="pin-glow">
-                            </div>
-
-                        {% endif %}
-
-
-
                         <div class="note-top">
 
 
@@ -1337,9 +869,6 @@ PAGE = """
 
                             </div>
 
-
-
-                            <!-- PIN -->
 
                             <form
                                 class="pin-form"
@@ -1358,19 +887,11 @@ PAGE = """
                                 <button
                                     class="
                                         pin-button
-
                                         {% if note[2] %}
                                             active
                                         {% endif %}
                                     "
                                     type="submit"
-                                    title="
-                                        {% if note[2] %}
-                                            Fjern pin
-                                        {% else %}
-                                            Pin note
-                                        {% endif %}
-                                    "
                                 >
                                     📌
                                 </button>
@@ -1381,9 +902,6 @@ PAGE = """
 
                         </div>
 
-
-
-                        <!-- INFO -->
 
                         <div class="note-meta">
 
@@ -1418,35 +936,22 @@ PAGE = """
                         </div>
 
 
-
-                        <!-- KNAPPER -->
-
                         <div class="note-actions">
 
 
                             <button
-                                class="
-                                    action-button
-                                    edit-button
-                                "
+                                class="action-button edit-button"
                                 type="button"
-                                onclick="
-                                    openEditModal(this)
-                                "
+                                onclick="openEditModal(this)"
                             >
                                 ✏️ Rediger
                             </button>
 
 
                             <button
-                                class="
-                                    action-button
-                                    delete-button
-                                "
+                                class="action-button delete-button"
                                 type="button"
-                                onclick="
-                                    openDeleteModal(this)
-                                "
+                                onclick="openDeleteModal(this)"
                             >
                                 Slet
                             </button>
@@ -1490,8 +995,7 @@ PAGE = """
                         </h2>
 
                         <p>
-                            Der blev ikke fundet noget for
-                            "{{ search }}"
+                            Der blev ikke fundet noget for "{{ search }}"
                         </p>
 
 
@@ -1523,33 +1027,19 @@ PAGE = """
 
 
 
-    <!-- =====================================================
-         PLUS KNAP
-    ====================================================== -->
-
     <button
         class="add-button"
         onclick="openAddModal()"
-        aria-label="Ny note"
     >
         +
     </button>
 
 
 
-    <!-- =====================================================
-         NY NOTE POPUP
-    ====================================================== -->
-
     <div
         class="modal-background"
         id="addModal"
-        onclick="
-            closeBackground(
-                event,
-                'addModal'
-            )
-        "
+        onclick="closeBackground(event, 'addModal')"
     >
 
 
@@ -1588,11 +1078,7 @@ PAGE = """
                     <button
                         type="button"
                         class="cancel-button"
-                        onclick="
-                            closeModal(
-                                'addModal'
-                            )
-                        "
+                        onclick="closeModal('addModal')"
                     >
                         Annuller
                     </button>
@@ -1619,19 +1105,10 @@ PAGE = """
 
 
 
-    <!-- =====================================================
-         REDIGER POPUP
-    ====================================================== -->
-
     <div
         class="modal-background"
         id="editModal"
-        onclick="
-            closeBackground(
-                event,
-                'editModal'
-            )
-        "
+        onclick="closeBackground(event, 'editModal')"
     >
 
 
@@ -1679,11 +1156,7 @@ PAGE = """
                     <button
                         type="button"
                         class="cancel-button"
-                        onclick="
-                            closeModal(
-                                'editModal'
-                            )
-                        "
+                        onclick="closeModal('editModal')"
                     >
                         Annuller
                     </button>
@@ -1710,29 +1183,17 @@ PAGE = """
 
 
 
-    <!-- =====================================================
-         SLET POPUP
-    ====================================================== -->
-
     <div
         class="modal-background"
         id="deleteModal"
-        onclick="
-            closeBackground(
-                event,
-                'deleteModal'
-            )
-        "
+        onclick="closeBackground(event, 'deleteModal')"
     >
 
 
         <div class="modal">
 
 
-            <div class="
-                modal-icon
-                delete-icon
-            ">
+            <div class="modal-icon delete-icon">
                 !
             </div>
 
@@ -1773,11 +1234,7 @@ PAGE = """
                     <button
                         type="button"
                         class="cancel-button"
-                        onclick="
-                            closeModal(
-                                'deleteModal'
-                            )
-                        "
+                        onclick="closeModal('deleteModal')"
                     >
                         Behold
                     </button>
@@ -1804,34 +1261,19 @@ PAGE = """
 
 
 
-    <!-- =====================================================
-         JAVASCRIPT
-    ====================================================== -->
-
     <script>
 
-
-        // ==================================================
-        // NY NOTE
-        // ==================================================
 
         function openAddModal() {
 
             const modal =
-                document.getElementById(
-                    "addModal"
-                );
-
+                document.getElementById("addModal");
 
             const input =
-                document.getElementById(
-                    "noteInput"
-                );
+                document.getElementById("noteInput");
 
 
-            modal
-                .classList
-                .add("show");
+            modal.classList.add("show");
 
 
             setTimeout(
@@ -1846,53 +1288,34 @@ PAGE = """
         }
 
 
-
-        // ==================================================
-        // REDIGER
-        // ==================================================
-
         function openEditModal(button) {
 
-
             const card =
-                button.closest(
-                    ".note-card"
-                );
-
+                button.closest(".note-card");
 
             const id =
                 card.dataset.id;
 
-
             const text =
                 card
-                    .querySelector(
-                        ".note-text"
-                    )
+                    .querySelector(".note-text")
                     .textContent
                     .trim();
 
 
-            document
-                .getElementById(
-                    "editId"
-                )
-                .value = id;
+            document.getElementById("editId").value =
+                id;
 
 
             const input =
-                document.getElementById(
-                    "editNote"
-                );
+                document.getElementById("editNote");
 
 
             input.value = text;
 
 
             document
-                .getElementById(
-                    "editModal"
-                )
+                .getElementById("editModal")
                 .classList
                 .add("show");
 
@@ -1901,7 +1324,6 @@ PAGE = """
                 function() {
 
                     input.focus();
-
 
                     input.setSelectionRange(
                         input.value.length,
@@ -1915,61 +1337,36 @@ PAGE = """
         }
 
 
-
-        // ==================================================
-        // SLET
-        // ==================================================
-
         function openDeleteModal(button) {
 
-
             const card =
-                button.closest(
-                    ".note-card"
-                );
-
+                button.closest(".note-card");
 
             const id =
                 card.dataset.id;
 
-
             const text =
                 card
-                    .querySelector(
-                        ".note-text"
-                    )
+                    .querySelector(".note-text")
                     .textContent
                     .trim();
 
 
-            document
-                .getElementById(
-                    "deleteId"
-                )
-                .value = id;
+            document.getElementById("deleteId").value =
+                id;
+
+
+            document.getElementById("deletePreview").textContent =
+                text;
 
 
             document
-                .getElementById(
-                    "deletePreview"
-                )
-                .textContent = text;
-
-
-            document
-                .getElementById(
-                    "deleteModal"
-                )
+                .getElementById("deleteModal")
                 .classList
                 .add("show");
 
         }
 
-
-
-        // ==================================================
-        // LUK POPUP
-        // ==================================================
 
         function closeModal(id) {
 
@@ -1981,15 +1378,9 @@ PAGE = """
         }
 
 
+        function closeBackground(event, id) {
 
-        function closeBackground(
-            event,
-            id
-        ) {
-
-            if (
-                event.target.id === id
-            ) {
+            if (event.target.id === id) {
 
                 closeModal(id);
 
@@ -1998,31 +1389,15 @@ PAGE = """
         }
 
 
-
-        // ==================================================
-        // ESCAPE
-        // ==================================================
-
         document.addEventListener(
             "keydown",
             function(event) {
 
-                if (
-                    event.key ===
-                    "Escape"
-                ) {
+                if (event.key === "Escape") {
 
-                    closeModal(
-                        "addModal"
-                    );
-
-                    closeModal(
-                        "editModal"
-                    );
-
-                    closeModal(
-                        "deleteModal"
-                    );
+                    closeModal("addModal");
+                    closeModal("editModal");
+                    closeModal("deleteModal");
 
                 }
 
@@ -2043,37 +1418,21 @@ PAGE = """
 # FORSIDE + NY NOTE
 # ==========================================================
 
-@app.route(
-    "/",
-    methods=[
-        "GET",
-        "POST"
-    ]
-)
+@app.route("/", methods=["GET", "POST"])
 def home():
 
-
-    # ------------------------------------------------------
-    # GEM NY NOTE
-    # ------------------------------------------------------
-
     if request.method == "POST":
-
 
         note = request.form.get(
             "note",
             ""
         ).strip()
 
-
         if note:
-
 
             with get_connection() as connection:
 
-
                 with connection.cursor() as cursor:
-
 
                     cursor.execute(
                         """
@@ -2093,17 +1452,10 @@ def home():
                         (note,)
                     )
 
-
                 connection.commit()
-
 
         return redirect("/")
 
-
-
-    # ------------------------------------------------------
-    # SØG
-    # ------------------------------------------------------
 
     search = request.args.get(
         "q",
@@ -2111,32 +1463,10 @@ def home():
     ).strip()
 
 
-    notes = load_notes(
-        search
-    )
+    notes = load_notes(search)
 
 
-
-    # ------------------------------------------------------
-    # ANTAL NOTER TOTALT
-    # ------------------------------------------------------
-
-    with get_connection() as connection:
-
-
-        with connection.cursor() as cursor:
-
-
-            cursor.execute(
-                """
-                SELECT COUNT(*)
-                FROM notes
-                """
-            )
-
-
-            total_notes =
-                cursor.fetchone()[0]
+    total_notes = get_total_notes()
 
 
     return render_template_string(
@@ -2151,48 +1481,29 @@ def home():
 # REDIGER NOTE
 # ==========================================================
 
-@app.route(
-    "/edit",
-    methods=["POST"]
-)
+@app.route("/edit", methods=["POST"])
 def edit_note():
 
+    note_id = request.form.get("id")
 
-    note_id =
-        request.form.get(
-            "id"
-        )
-
-
-    new_text =
-        request.form.get(
-            "note",
-            ""
-        ).strip()
+    new_text = request.form.get(
+        "note",
+        ""
+    ).strip()
 
 
-    if (
-        note_id
-        and
-        new_text
-    ):
-
+    if note_id and new_text:
 
         with get_connection() as connection:
 
-
             with connection.cursor() as cursor:
-
 
                 cursor.execute(
                     """
                     UPDATE notes
-
                     SET
                         text = %s,
-                        updated_at =
-                            CURRENT_TIMESTAMP
-
+                        updated_at = CURRENT_TIMESTAMP
                     WHERE id = %s
                     """,
                     (
@@ -2200,7 +1511,6 @@ def edit_note():
                         note_id
                     )
                 )
-
 
             connection.commit()
 
@@ -2212,40 +1522,26 @@ def edit_note():
 # PIN NOTE
 # ==========================================================
 
-@app.route(
-    "/pin",
-    methods=["POST"]
-)
+@app.route("/pin", methods=["POST"])
 def pin_note():
 
-
-    note_id =
-        request.form.get(
-            "id"
-        )
+    note_id = request.form.get("id")
 
 
     if note_id:
 
-
         with get_connection() as connection:
 
-
             with connection.cursor() as cursor:
-
 
                 cursor.execute(
                     """
                     UPDATE notes
-
-                    SET pinned =
-                        NOT pinned
-
+                    SET pinned = NOT pinned
                     WHERE id = %s
                     """,
                     (note_id,)
                 )
-
 
             connection.commit()
 
@@ -2257,37 +1553,25 @@ def pin_note():
 # SLET NOTE
 # ==========================================================
 
-@app.route(
-    "/delete",
-    methods=["POST"]
-)
+@app.route("/delete", methods=["POST"])
 def delete_note():
 
-
-    note_id =
-        request.form.get(
-            "id"
-        )
+    note_id = request.form.get("id")
 
 
     if note_id:
 
-
         with get_connection() as connection:
 
-
             with connection.cursor() as cursor:
-
 
                 cursor.execute(
                     """
                     DELETE FROM notes
-
                     WHERE id = %s
                     """,
                     (note_id,)
                 )
-
 
             connection.commit()
 
